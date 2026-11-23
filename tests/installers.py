@@ -4,10 +4,11 @@ from pathlib import Path
 import shutil
 import tempfile
 from support import Harness, ROOT
+from support import luau_string
 
 with tempfile.TemporaryDirectory(prefix="xtpkg-install-tests-") as temporary:
     h = Harness(temporary)
-    prefix = h.base / "install with spaces"
+    prefix = h.base / "install with spaces é"
     profile = h.base / "shell profile"
     h.env["XTPKG_PATH_PROFILE"] = str(profile)
     extension = ".cmd" if os.name == "nt" else ""
@@ -48,7 +49,7 @@ with tempfile.TemporaryDirectory(prefix="xtpkg-install-tests-") as temporary:
     main = prefix / "app/src/main.luau"
     main_before = main.read_bytes()
     main.write_text('local j=require("serde/json"); local a={}; for i=3,#process.argv do table.insert(a,process.argv[i]) end; print(j.encode(a))\n', encoding="utf-8")
-    arguments = ["a b", "", "^1.2.3", "a&b", "a|b", "x>y", "é"]
+    arguments = ["a b", "", "^1.2.3", "a&b", "a|b", "x>y", "é", 'say "hello"', "100%", "a!b", "trailing\\"]
     h.check(json.loads(h.launch(executable, arguments)) == arguments)
     main.write_bytes(main_before)
 
@@ -65,7 +66,7 @@ end
 local ok,err=pcall(function() I.run(%s,{prefix=%s}) end)
 assert(injected and not ok and tostring(err):find("profile failure",1,true))
 print("ROLLBACK_OK")
-''' % tuple(json.dumps(str(p).replace("\\", "/")) for p in (ROOT / "src/setup/Install", profile, ROOT, prefix)), encoding="utf-8")
+''' % tuple(luau_string(str(p).replace("\\", "/")) for p in (ROOT / "src/setup/Install", profile, ROOT, prefix)), encoding="utf-8")
     # Make a different PATH block so the atomic profile-write failure is reached.
     profile.write_text("# changed safely before setup\n", encoding="utf-8")
     h.check("ROLLBACK_OK" in h.run([h.runtime, injected]))
@@ -85,7 +86,7 @@ fs.rename=function(a,b)
  return original(a,b)
 end
 I.run(%s,{prefix=%s,noPath=true})
-''' % tuple(json.dumps(str(p).replace("\\", "/")) for p in (ROOT / "src/setup/Install", prefix / "bin", ROOT, prefix)), encoding="utf-8")
+''' % tuple(luau_string(str(p).replace("\\", "/")) for p in (ROOT / "src/setup/Install", prefix / "bin", ROOT, prefix)), encoding="utf-8")
     h.run([h.runtime, interrupted], ok=False)
     h.check((prefix / ".xtpkg-setup-operation/journal.json").exists())
     h.check("--recover" in install(ok=False))
@@ -100,6 +101,16 @@ I.run(%s,{prefix=%s,noPath=true})
     h.check(executable.read_text() == "user executable")
     executable.write_bytes(launcher_bytes)
     install("--no-path")
+    if os.name == "nt":
+        shim = h.base / "runtime shim.cmd"
+        shim.write_bytes(('@echo off\r\n"' + h.runtime.replace("%", "%%") + '" %*\r\n').encode("utf-8"))
+        h.check("Installed XTPKG" in install("--no-path", env=dict(h.env, LUAUXTX_BIN=str(shim))))
+        h.check("REGISTRY_PATH_OK" in h.run([h.runtime, ROOT / "tests/windows-path.luau", "Software\\XTPKGTests-" + h.base.name]))
+    command_env = dict(h.env, PATH=str(prefix / "bin") + os.pathsep + h.env["PATH"])
+    if os.name == "nt":
+        h.check("xtpkg " in h.run([os.environ["COMSPEC"], "/d", "/c", "xtpkg --version"], env=command_env))
+    else:
+        h.check("xtpkg " in h.run(["xtpkg", "--version"], env=command_env))
 
     # Source dependencies are bootstrapped through the regular package manager;
     # the explicit script hook below must never execute.
@@ -109,7 +120,7 @@ I.run(%s,{prefix=%s,noPath=true})
     manifest = (ROOT / "xtpkg.toml").read_text().replace("[dependencies]", '[dependencies]\n"setup-library" = "path:' + dependency.as_posix() + '"')
     (source / "xtpkg.toml").write_text(manifest + '\n[hooks]\ninstall="echo UNSAFE_HOOK"\n', encoding="utf-8")
     bootstrap = h.base / "bootstrap.luau"
-    bootstrap.write_text('local I=require(' + json.dumps((ROOT / "src/setup/Install").as_posix()) + '); I.run(' + json.dumps(source.as_posix()) + ',{prefix=' + json.dumps(prefix.as_posix()) + ',noPath=true})', encoding="utf-8")
+    bootstrap.write_text('local I=require(' + luau_string((ROOT / "src/setup/Install").as_posix()) + '); I.run(' + luau_string(source.as_posix()) + ',{prefix=' + luau_string(prefix.as_posix()) + ',noPath=true})', encoding="utf-8")
     output = h.run([h.runtime, bootstrap])
     h.check("UNSAFE_HOOK" not in output)
     h.check((prefix / "app/packages/setup-library/init.luau").exists())

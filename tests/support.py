@@ -6,6 +6,8 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
+def luau_string(value):
+    return json.dumps(value, ensure_ascii=False)
 
 
 def runtime_path(candidate=None):
@@ -69,6 +71,13 @@ class Harness:
     def launch(self, executable, arguments):
         if os.name == "nt":
             # Quote even shell metacharacters that list2cmdline leaves bare.
-            command = '"' + str(executable) + '" ' + " ".join('"' + a.replace('"', '\\"') + '"' for a in arguments)
+            def quote(value):
+                result, slashes = '"', 0
+                for char in value:
+                    if char == "\\": slashes += 1
+                    elif char == '"': result += "\\" * (slashes * 2 + 1) + '"'; slashes = 0
+                    else: result += "\\" * slashes + char; slashes = 0
+                return result + "\\" * (slashes * 2) + '"'
+            command = quote(str(executable)) + ' ' + " ".join(quote(a) for a in arguments)
             return self.run(subprocess.list2cmdline([os.environ["COMSPEC"]]) + ' /d /v:off /s /c "' + command + '"')
         return self.run([executable, *arguments])

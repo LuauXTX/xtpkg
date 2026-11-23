@@ -3,21 +3,26 @@ import os
 from pathlib import Path
 import tempfile
 from support import Harness, ROOT
+from support import luau_string
 
 with tempfile.TemporaryDirectory(prefix="xtpkg-global-tests-") as directory:
     h = Harness(directory)
+    h.env["XTPKG_GLOBAL_DIR"] += " é"
     root = Path(h.env["XTPKG_GLOBAL_DIR"])
     extension = ".cmd" if os.name == "nt" else ""
     tool = h.package("tool", {"xtpkg-test-tool": "cli.luau"})
-    library = h.package("library")
+    transitive = h.package("transitive", {"xtpkg-test-transitive": "cli.luau"})
+    library = h.package("library", dependencies={"transitive": "path:../transitive"})
     h.check("No dependencies" in h.cli("list", "-g"))
     h.cli("add", "../tool", "--global")
     h.check(not (h.cwd / "xtpkg.toml").exists())
     h.check((root / "packages/tool/cli.luau").is_file())
     executable = root / "bin" / ("xtpkg-test-tool" + extension)
-    arguments = ["hello world", "", "^1.2.3", "a&b", "a|b", "x>y", "é", "plain"]
+    arguments = ["hello world", "", "^1.2.3", "a&b", "a|b", "x>y", "é", 'say "hello"', "100%", "a!b"]
     h.check(json.loads(h.launch(executable, arguments).strip()) == arguments)
     h.cli("add", str(library), "-g")
+    h.check((root / "packages/transitive").is_dir())
+    h.check(not (root / "bin" / ("xtpkg-test-transitive" + extension)).exists())
     h.check("library" in h.cli("list", "--global", "--tree"))
     lock = (root / "xtpkg.lock").read_bytes()
     h.cli("install", "-g", "--frozen")
@@ -38,7 +43,7 @@ with tempfile.TemporaryDirectory(prefix="xtpkg-global-tests-") as directory:
     from hashlib import sha256
     from support import ROOT
     restore = h.base / "restore.luau"
-    restore.write_text('local L = require(' + json.dumps((ROOT / "src/package/Launchers").as_posix()) + ')\nlocal fs=require("system/fs")\nfs.writeSync(' + json.dumps(executable.as_posix()) + ', L.render(' + json.dumps(h.runtime.replace("\\", "/")) + ', ' + json.dumps((root / "packages/tool/cli.luau").as_posix()) + ', ' + ("true" if os.name == "nt" else "false") + '))\n', encoding="utf-8")
+    restore.write_text('local L = require(' + luau_string((ROOT / "src/package/Launchers").as_posix()) + ')\nlocal fs=require("system/fs")\nfs.writeSync(' + luau_string(executable.as_posix()) + ', L.render(' + luau_string(h.runtime.replace("\\", "/")) + ', ' + luau_string((root / "packages/tool/cli.luau").as_posix()) + ', ' + ("true" if os.name == "nt" else "false") + '))\n', encoding="utf-8")
     h.run([h.runtime, restore])
     rollback = h.base / "rollback.luau"
     rollback.write_text('''local fs=require("system/fs")
@@ -63,4 +68,24 @@ print("ROLLBACK_OK")
     h.cli("remove", "library", "--global")
     h.check("No dependencies" in h.cli("list", "-g"))
     h.check(not list(root.glob(".xtpkg-stage-*")))
+    external = h.base / "external-bin"
+    external.mkdir()
+    (external / ("xtpkg-test-external" + extension)).write_text("unrelated executable")
+    outside_tool = h.package("outside-tool", {"xtpkg-test-external": "cli.luau"})
+    env = dict(h.env, PATH=str(external) + os.pathsep + h.env["PATH"])
+    h.check("conflict on PATH" in h.cli("add", str(outside_tool), "-g", env=env, ok=False))
+    h.check((external / ("xtpkg-test-external" + extension)).read_text() == "unrelated executable")
+    h.cli("init", "caller")
+    h.cli("add", str(tool))
+    h.check(not (h.cwd / "bin").exists())
+    h.check("not supported" in h.cli("init", "-g", ok=False))
+    rename = h.package("rename", {"xtpkg-test-old": "cli.luau"})
+    h.cli("add", str(rename), "-g")
+    (rename / "xtpkg.toml").write_text((rename / "xtpkg.toml").read_text().replace("xtpkg-test-old", "xtpkg-test-new"), encoding="utf-8")
+    h.cli("update", "rename", "-g")
+    h.check(not (root / "bin" / ("xtpkg-test-old" + extension)).exists())
+    h.check((root / "bin" / ("xtpkg-test-new" + extension)).exists())
+    h.cli("remove", "rename", "-g")
+    reserved = h.package("reserved", {"git": "cli.luau"})
+    h.check("reserved" in h.cli("add", str(reserved), "-g", ok=False))
     print(f"PASS: {h.count} global integration assertions")

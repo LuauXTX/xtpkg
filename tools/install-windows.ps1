@@ -10,10 +10,10 @@ try {
         # directly and avoids CALL's second expansion of carets and percent signs.
         $probe = Join-Path $env:TEMP ('xtpkg-runtime-' + [guid]::NewGuid() + '.luau')
         try {
-            [IO.File]::WriteAllText($probe, 'print(process.argv[1])', (New-Object Text.UTF8Encoding($false)))
+            [IO.File]::WriteAllText($probe, 'print(require("crypto/base64").encode(process.argv[1]))', (New-Object Text.UTF8Encoding($false)))
             $resolved = & $runtime $probe
             if ($LASTEXITCODE -ne 0) { throw 'LuauXTX launcher probe failed.' }
-            $runtime = ([string]($resolved -join "`n")).Trim()
+            $runtime = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]($resolved -join "`n")).Trim()))
         } finally { if (Test-Path -LiteralPath $probe) { Remove-Item -LiteralPath $probe } }
     }
     if (-not [IO.Path]::IsPathRooted($runtime) -or [IO.Path]::GetExtension($runtime) -ne '.exe' -or -not (Test-Path -LiteralPath $runtime -PathType Leaf)) { throw 'Set LUAUXTX_BIN to the native LuauXTX .exe.' }

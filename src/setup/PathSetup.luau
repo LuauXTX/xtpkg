@@ -3,8 +3,16 @@ local path = require("system/path")
 local Util = require("../package/Util")
 local Json = require("../package/Json")
 local Launchers = require("../package/Launchers")
+local base64 = require("crypto/base64")
 local PathSetup = {}
 local beginMarker, endMarker = "# >>> xtpkg PATH >>>", "# <<< xtpkg PATH <<<"
+local function powershell(script, environment)
+    environment = table.clone(environment or {})
+    -- A PowerShell 7 parent may export incompatible module paths to WinPS 5.1.
+    -- Load only the system modules needed for registry JSON and notifications.
+    environment.PSModulePath = path.join(assert(process.getenv("SystemRoot")), "System32", "WindowsPowerShell", "v1.0", "Modules")
+    return process.exec("powershell.exe", { "-NoProfile", "-NonInteractive", "-Command", script }, { env = environment })
+end
 
 function PathSetup.windowsValue(value, directories)
     local result, seen = value, {}
@@ -49,8 +57,8 @@ local function write(filename, text)
     local ok, err = pcall(function()
         if Launchers.windows() then
             if fs.exists(filename) then
-                local r = process.exec("powershell.exe", { "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; $acl=Get-Acl -LiteralPath $env:XTPKG_PROFILE_FROM; $f=[IO.File]::Open($env:XTPKG_PROFILE_TO,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None); $f.Dispose(); Set-Acl -LiteralPath $env:XTPKG_PROFILE_TO -AclObject $acl" }, { env = { XTPKG_PROFILE_FROM = filename, XTPKG_PROFILE_TO = temporary } })
-                if r.code ~= 0 then error("Could not preserve profile permissions", 0) end
+                local r = powershell("$ErrorActionPreference='Stop'; $section=[Security.AccessControl.AccessControlSections]::Access; $original=[IO.File]::GetAccessControl($env:XTPKG_PROFILE_FROM,$section); $acl=[Security.AccessControl.FileSecurity]::new(); $acl.SetSecurityDescriptorSddlForm($original.GetSecurityDescriptorSddlForm($section),$section); $f=[IO.File]::Open($env:XTPKG_PROFILE_TO,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None); $f.Dispose(); [IO.File]::SetAccessControl($env:XTPKG_PROFILE_TO,$acl)", { XTPKG_PROFILE_FROM = filename, XTPKG_PROFILE_TO = temporary })
+                if r.code ~= 0 then error("Could not preserve profile permissions: " .. r.stderr .. r.stdout, 0) end
             end
         else
             local mode
@@ -73,19 +81,19 @@ local function write(filename, text)
 end
 
 local function registryRead()
-    local r = process.exec("powershell.exe", { "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; $k=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment'); $v=''; $kind='ExpandString'; $exists=$false; if($k) { if($k.GetValueNames() -contains 'Path') { $exists=$true; $v=$k.GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames); $kind=$k.GetValueKind('Path').ToString() }; $k.Dispose() }; @{value=$v; kind=$kind; exists=$exists} | ConvertTo-Json -Compress" })
+    local r = powershell("$ErrorActionPreference='Stop'; $k=[Microsoft.Win32.Registry]::CurrentUser.OpenSubKey('Environment'); $v=''; $kind='ExpandString'; $exists=$false; if($k) { if($k.GetValueNames() -contains 'Path') { $exists=$true; $v=$k.GetValue('Path','',[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames); $kind=$k.GetValueKind('Path').ToString() }; $k.Dispose() }; $j=@{value=$v; kind=$kind; exists=$exists} | ConvertTo-Json -Compress; [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($j))")
     if r.code ~= 0 then error("Cannot read user PATH from the registry", 0) end
-    local state = Json.decode(r.stdout, 65536)
+    local state = Json.decode(base64.decode(r.stdout:match("^%s*(.-)%s*$")), 65536)
     if type(state.value) ~= "string" or (state.kind ~= "String" and state.kind ~= "ExpandString") then error("Unsupported user PATH registry value", 0) end
     return state
 end
 local function registryWrite(state)
-    local r = process.exec("powershell.exe", { "-NoProfile", "-NonInteractive", "-Command", "$ErrorActionPreference='Stop'; $s=$env:XTPKG_PATH_STATE | ConvertFrom-Json; $k=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment'); try { if($s.exists) { $kind=[Enum]::Parse([Microsoft.Win32.RegistryValueKind],[string]$s.kind); $k.SetValue('Path',[string]$s.value,$kind) } else { $k.DeleteValue('Path',$false) } } finally { $k.Dispose() }" }, { env = { XTPKG_PATH_STATE = Json.encode(state) } })
+    local r = powershell("$ErrorActionPreference='Stop'; $s=$env:XTPKG_PATH_STATE | ConvertFrom-Json; $k=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey('Environment'); try { if($s.exists) { $kind=[Enum]::Parse([Microsoft.Win32.RegistryValueKind],[string]$s.kind); $k.SetValue('Path',[string]$s.value,$kind) } else { $k.DeleteValue('Path',$false) } } finally { $k.Dispose() }", { XTPKG_PATH_STATE = Json.encode(state) })
     if r.code ~= 0 then error("Cannot update user PATH registry value", 0) end
 end
 local function notifyWindows()
     -- Notify Explorer/new terminals without modifying any unrelated variables.
-    local r = process.exec("powershell.exe", { "-NoProfile", "-NonInteractive", "-Command", "Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class XtpkgEnvironmentNotice { [DllImport(\"user32.dll\", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, UIntPtr wp, string lp, uint flags, uint timeout, out UIntPtr result); }'; $r=[UIntPtr]::Zero; [void][XtpkgEnvironmentNotice]::SendMessageTimeout([IntPtr]65535,26,[UIntPtr]::Zero,'Environment',2,2000,[ref]$r)" })
+    local r = powershell("Add-Type -TypeDefinition 'using System; using System.Runtime.InteropServices; public static class XtpkgEnvironmentNotice { [DllImport(\"user32.dll\", CharSet=CharSet.Unicode)] public static extern IntPtr SendMessageTimeout(IntPtr hwnd, uint msg, UIntPtr wp, string lp, uint flags, uint timeout, out UIntPtr result); }'; $r=[UIntPtr]::Zero; [void][XtpkgEnvironmentNotice]::SendMessageTimeout([IntPtr]65535,26,[UIntPtr]::Zero,'Environment',2,2000,[ref]$r)")
     if r.code ~= 0 then print("PATH updated; sign out and back in if new terminals do not see it.") end
 end
 

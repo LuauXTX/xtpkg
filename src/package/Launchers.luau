@@ -24,7 +24,7 @@ function Launchers.render(runtime, entry, windows)
     if runtime:find('["%c]') or entry:find('["%c]') then error("Unsupported quote/control character in launcher path", 0) end
     if windows then
         local function batch(s) return s:gsub("%%", function() return "%%" end) end
-        return '@echo off\r\nsetlocal DisableDelayedExpansion\r\n"' .. batch(runtime) .. '" "' .. batch(entry) .. '" %*\r\nexit /b %errorlevel%\r\n'
+        return '@echo off\r\nsetlocal DisableDelayedExpansion\r\nfor /f "tokens=2 delims=:." %%P in (\'"%SystemRoot%\\System32\\chcp.com"\') do set "_xtpkg_cp=%%P"\r\n"%SystemRoot%\\System32\\chcp.com" 65001 >nul\r\n"' .. batch(runtime) .. '" "' .. batch(entry) .. '" %*\r\nset "_xtpkg_result=%errorlevel%"\r\nif defined _xtpkg_cp "%SystemRoot%\\System32\\chcp.com" %_xtpkg_cp% >nul\r\nexit /b %_xtpkg_result%\r\n'
     end
     return "#!/bin/sh\nexec " .. Launchers.shell(runtime) .. " " .. Launchers.shell(entry) .. ' "$@"\n'
 end
@@ -48,6 +48,9 @@ end
 function Launchers.conflict(name, destination)
     local reserved = { xtpkg = true, luauxtx = true, git = true, sh = true, bash = true, cmd = true, powershell = true, chmod = true, stat = true, find = true, where = true, uname = true }
     if reserved[name] then error("Executable name " .. name .. " is reserved for the package manager and its host tools", 0) end
+    Launchers.pathConflict(name, destination)
+end
+function Launchers.pathConflict(name, destination)
     local separator = Launchers.windows() and ";" or ":"
     for dir in (process.getenv("PATH") or ""):gmatch("[^" .. separator .. "]+") do
         dir = dir:gsub('^"(.*)"$', "%1")
@@ -60,9 +63,11 @@ function Launchers.conflict(name, destination)
     end
 end
 function Launchers.write(directory, commands, runtime)
+    local names = Util.keys(commands)
+    if #names > 256 then error("Too many global executables (limit 256)", 0) end
     Util.mkdir(directory)
     local ownership = { version = 1, files = {} }
-    for _, name in ipairs(Util.keys(commands)) do
+    for _, name in ipairs(names) do
         if not Util.name(name) or name:find("/", 1, true) then error("Unsafe executable name", 0) end
         local filename = name .. (Launchers.windows() and ".cmd" or "")
         local contents = Launchers.render(runtime, commands[name], Launchers.windows())

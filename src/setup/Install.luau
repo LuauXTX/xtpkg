@@ -75,6 +75,7 @@ function Install.run(source, options)
     local state, plan, pathApplied
     local ok, err = pcall(function()
         ownedApp(path.join(prefix, "app")); Launchers.verify(path.join(prefix, "bin"))
+        if not options.noPath then Launchers.pathConflict("xtpkg", path.join(prefix, "bin")) end
         local runtime = Launchers.runtime()
         if process.exec("git", { "--version" }).code ~= 0 then error("Git is required on PATH", 0) end
         local app = path.join(work, "app"); fs.mkdir(app, false):await()
