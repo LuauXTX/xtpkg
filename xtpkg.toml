@@ -1,0 +1,10 @@
+[package]
+"entry" = "src/main.luau"
+"name" = "xtpkg"
+"version" = "0.2.0"
+"description" = "A lightweight LuauXTX package manager featuring deterministic dependency resolution, SemVer versioning, Git-based registries, verified caching, and reproducible installations."
+
+[dependencies]
+
+[scripts]
+"start" = "luauxtx src/main.luau"
