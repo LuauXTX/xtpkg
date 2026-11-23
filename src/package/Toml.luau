@@ -1,4 +1,4 @@
--- A strict scalar TOML reader for XTPKG's three supported sections. Other
+-- A strict scalar TOML reader for XTPKG's supported sections. Other
 -- sections are preserved byte-for-byte when dependency declarations change.
 local Json = require("./Json")
 local Toml = {}
@@ -38,8 +38,8 @@ function Toml.decode(text)
             if not section then error("Unsupported or malformed TOML table header: " .. line, 0) end
             if seen[section] then error("Duplicate TOML table: " .. section, 0) end
             seen[section] = true
-            if section == "package" or section == "dependencies" or section == "scripts" then result[section] = {} end
-        elseif section == "package" or section == "dependencies" or section == "scripts" then
+            if section == "package" or section == "dependencies" or section == "scripts" or section == "bin" then result[section] = {} end
+        elseif section == "package" or section == "dependencies" or section == "scripts" or section == "bin" then
             local k, v = line:match('^("[^"\r\n]+")%s*=%s*(.+)$')
             if not k then k, v = line:match("^('[^'\r\n]+')%s*=%s*(.+)$") end
             if not k then k, v = line:match("^([%w_-]+)%s*=%s*(.+)$") end

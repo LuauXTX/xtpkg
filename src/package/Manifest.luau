@@ -40,6 +40,14 @@ function Manifest.validate(manifest)
             end
         end
     end
+    manifest.bin = manifest.bin or {}
+    if type(manifest.bin) ~= "table" then error("bin must be a table", 0) end
+    local bins = 0
+    for name, entry in pairs(manifest.bin) do
+        bins += 1
+        if bins > 64 or not Util.name(name) or name:find("/", 1, true) then error("Invalid executable name in [bin] (use a portable unscoped name; limit 64)", 0) end
+        if not Util.relative(entry) or not entry:match("%.luau?$") then error("bin." .. name .. " must be a safe relative .lua or .luau file", 0) end
+    end
     return manifest
 end
 function Manifest.decode(text)
@@ -57,7 +65,8 @@ function Manifest.render(manifest)
     Manifest.validate(manifest)
     if manifest._text then return Toml.dependencies(manifest._text, manifest.dependencies) end
     local lines = {}
-    for _, section in ipairs({ "package", "dependencies", "scripts" }) do
+    for _, section in ipairs({ "package", "dependencies", "scripts", "bin" }) do
+        if section == "bin" and next(manifest.bin) == nil then continue end
         table.insert(lines, "[" .. section .. "]")
         for _, key in ipairs(Util.keys(manifest[section])) do
             local v = manifest[section][key]

@@ -16,10 +16,13 @@ local ok, err = xpcall(function()
         list = { tree = true }, run = {}, search = { ["allow-local-sources"] = true }, info = { ["allow-local-sources"] = true }, update = { ["allow-git"] = true, ["allow-local-sources"] = true }, outdated = { ["allow-local-sources"] = true }, publish = { ["dry-run"] = true, output = true }, cache = {}, config = {},
     }
     for key in pairs(parsed) do
-        if key ~= "_" and key ~= "verbose" and key ~= "quiet" and key ~= "offline" and not validOptions[name][key] then error("Option --" .. key .. " is not supported by " .. name, 0) end
+        local globalAllowed = key == "global" and (name == "add" or name == "remove" or name == "update" or name == "list" or name == "install")
+        if key ~= "_" and key ~= "verbose" and key ~= "quiet" and key ~= "offline" and not globalAllowed and not validOptions[name][key] then error("Option --" .. key .. " is not supported by " .. name, 0) end
     end
     parsed.log = function(message) if not parsed.quiet then print(message) end end
-    commandRequire("./commands/" .. name).run(parsed)
+    local command = commandRequire("./commands/" .. name)
+    if parsed.global then commandRequire("./package/Global").run(parsed, function() command.run(parsed) end)
+    else command.run(parsed) end
 end, function(e)
     if parsed and parsed.verbose then return debug.traceback(tostring(e), 2) end
     return tostring(e):gsub("\nstack traceback:.*", "")

@@ -4,6 +4,7 @@ local Util = require("./Util")
 local Source = require("./Source")
 local Json = require("./Json")
 local Lockfile = require("./Lockfile")
+local Launchers = require("./Launchers")
 local Installer = {}
 local marker = "xtpkg-packages-v2\n"
 local function checkOwned(directory, previous)
@@ -30,7 +31,7 @@ function Installer.install(directory, previous, lock, options)
     local rollbacks, committed = {}, false
     local ok, err = pcall(function()
         local stagedPackages = path.join(stage, "packages"); Util.mkdir(stagedPackages)
-        local imports, count = {}, 0
+        local imports, manifests, count = {}, {}, 0
         for _, name in ipairs(Util.keys(lock.packages)) do
             local p = lock.packages[name]
             -- Flat namespace: an unscoped package cannot also be a scope.
@@ -41,6 +42,7 @@ function Installer.install(directory, previous, lock, options)
             local snapshot = Source.obtain(p, options)
             local manifest = Source.validate(snapshot, { name = name, version = p.version, integrity = p.integrity, entry = p.entry, dependencies = p.requirements })
             p.integrity, p.entry = snapshot.integrity, manifest.package.entry
+            manifests[name] = manifest
             local packageDir = path.join(stagedPackages, name)
             for _, file in ipairs(Util.keys(snapshot.files)) do
                 local target = path.join(packageDir, file)
@@ -58,6 +60,18 @@ function Installer.install(directory, previous, lock, options)
         for _, name in ipairs(Util.keys(imports)) do table.insert(module, "  [" .. Json.encode(name) .. "] = " .. Json.encode(imports[name].path) .. ",") end
         table.insert(module, "}\nreturn { require = function(name)\n  local p = paths[name]\n  assert(p, 'Package is not installed: ' .. tostring(name))\n  return runtimeRequire(p)\nend }\n")
         fs.writeSync(path.join(stagedPackages, ".xtpkg-imports.luau"), table.concat(module, "\n"))
+        if options.global then
+            local bin = path.join(directory, "bin"); Launchers.verify(bin)
+            local commands = {}
+            for _, name in ipairs(Util.keys(lock.roots)) do
+                for executable, entry in pairs(manifests[name].bin) do
+                    if commands[executable] then error("Executable conflict: multiple global packages declare " .. executable, 0) end
+                    Launchers.conflict(executable, bin)
+                    commands[executable] = path.join(directory, "packages", name, entry)
+                end
+            end
+            Launchers.write(path.join(stage, "bin"), commands, Launchers.runtime())
+        end
         local renderedLock = Lockfile.render(lock)
         if options.locked and Lockfile.render(Lockfile.load(directory)) ~= renderedLock then error("--locked forbids lockfile changes; run xtpkg install without --locked", 0) end
         if not options.locked then fs.writeSync(path.join(stage, "xtpkg.lock"), renderedLock) end
@@ -72,6 +86,7 @@ function Installer.install(directory, previous, lock, options)
             fs.rename(staged, target):await()
         end
         replace("packages")
+        if options.global then replace("bin") end
         if not options.locked then replace("xtpkg.lock") end
         if options.manifestText then replace("xtpkg.toml") end
         committed = true

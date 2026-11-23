@@ -3,6 +3,13 @@ local path = require("system/path")
 local Json = require("./Json")
 local Util = require("./Util")
 local Config = {}
+function Config.data()
+    if process.getenv("COMSPEC") then return path.join(assert(process.getenv("LOCALAPPDATA"), "LOCALAPPDATA is required"), "xtpkg") end
+    return path.join(process.getenv("XDG_DATA_HOME") or path.join(assert(process.getenv("HOME"), "HOME is required"), ".local", "share"), "xtpkg")
+end
+function Config.global()
+    return Util.absolute(process.cwd(), process.getenv("XTPKG_GLOBAL_DIR") or path.join(Config.data(), "global"))
+end
 function Config.home()
     local base = process.getenv("XTPKG_CONFIG_HOME") or process.getenv("APPDATA") or process.getenv("XDG_CONFIG_HOME")
     return base and path.join(base, "xtpkg") or path.join(assert(process.getenv("HOME"), "Set XTPKG_CONFIG_HOME"), ".config", "xtpkg")

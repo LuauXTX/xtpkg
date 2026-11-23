@@ -26,6 +26,7 @@ function Help.show(name)
         for _, name in ipairs({ "init", "add", "remove", "install", "list", "run", "search", "info", "update", "outdated", "publish", "cache", "config", "help", "version" }) do print("  " .. Help.commands[name]) end
     end
     print("\nGlobal options: --help (-h), --version, --verbose (-v), --quiet (-q), --offline")
+    if not name or name == "add" or name == "remove" or name == "update" or name == "list" or name == "install" then print("Global packages: --global (-g) uses the managed standalone global project.") end
     if name == "add" or name == "install" or name == "update" or name == "remove" or name == "info" or name == "outdated" then print("Local registry fixtures: --allow-local-sources opts into absolute local Git sources.") end
     if name == "install" then print("--locked requires a current lock and forbids lock changes; downloads are allowed.\n--frozen also forbids resolution and network; all artifacts must already be verified in cache.") end
 end

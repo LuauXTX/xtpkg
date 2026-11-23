@@ -1,5 +1,5 @@
 local Args = {}
-local bools = { help = true, h = true, version = true, verbose = true, quiet = true, offline = true, locked = true, frozen = true, ["dry-run"] = true, tree = true, force = true, f = true, ["allow-git"] = true, ["allow-local-sources"] = true }
+local bools = { help = true, h = true, version = true, verbose = true, quiet = true, offline = true, locked = true, frozen = true, global = true, ["dry-run"] = true, tree = true, force = true, f = true, ["allow-git"] = true, ["allow-local-sources"] = true }
 local values = { output = true }
 function Args.parse(valuesIn)
     local result, positional = { _ = {} }, false
@@ -20,6 +20,7 @@ function Args.parse(valuesIn)
         elseif not positional and value:sub(1, 1) == "-" and #value > 1 then
             for c in value:sub(2):gmatch(".") do
                 if c == "h" or c == "f" then result[c] = true
+                elseif c == "g" then result.global = true
                 elseif c == "q" then result.quiet = true elseif c == "v" then result.verbose = true
                 else error("Unknown short option: -" .. c, 0) end
             end

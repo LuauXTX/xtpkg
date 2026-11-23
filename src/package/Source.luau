@@ -40,6 +40,7 @@ function Source.validate(snapshot, expected)
     if not text then error("Package is missing xtpkg.toml", 0) end
     local manifest = Manifest.decode(text)
     if not snapshot.files[manifest.package.entry] then error("Package entrypoint is missing: " .. manifest.package.entry, 0) end
+    for name, entry in pairs(manifest.bin) do if not snapshot.files[entry] then error("Executable entrypoint is missing: " .. name .. " -> " .. entry, 0) end end
     if expected then
         if manifest.package.name ~= expected.name or manifest.package.version ~= expected.version then error("Downloaded package identity/version does not match resolved metadata", 0) end
         if expected.entry and manifest.package.entry ~= expected.entry then error("Package entrypoint contradicts registry metadata", 0) end
