@@ -4,6 +4,7 @@
 "version" = "0.2.0"
 "description" = "A lightweight LuauXTX package manager featuring deterministic dependency resolution, SemVer versioning, Git-based registries, verified caching, and reproducible installations."
 "license" = "MIT"
+"repository" = "https://github.com/MINTILER-DEV/xtpkg"
 
 [dependencies]
 
