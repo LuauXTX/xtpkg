@@ -33,6 +33,8 @@ jobs:
         run: python -u tests/run.py --runtime "$env:LUAUXTX_BIN"
       - name: Global packages
         run: python -u tests/global.py
+      - name: Project initialization
+        run: python -u tests/init.py
       - name: Native installers
         run: python -u tests/installers.py
       - name: POSIX launchers and installer frontend

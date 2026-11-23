@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="xtpkg-tests-") as temporary:
     def luau(script, cwd=app, ok=True):
         return execute([runtime, str(script)], cwd, env, ok)
 
-    for name in ("core", "resolver", "security", "registry-client", "setup"):
+    for name in ("core", "resolver", "security", "registry-client", "setup", "project-init"):
         print(f"Running {name} checks...", flush=True)
         report = luau(ROOT / f"tests/{name}.luau").strip()
         print(report, flush=True)

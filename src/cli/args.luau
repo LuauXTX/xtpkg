@@ -1,5 +1,5 @@
 local Args = {}
-local bools = { help = true, h = true, version = true, verbose = true, quiet = true, offline = true, locked = true, frozen = true, global = true, ["dry-run"] = true, tree = true, force = true, f = true, ["allow-git"] = true, ["allow-local-sources"] = true }
+local bools = { help = true, h = true, version = true, verbose = true, quiet = true, offline = true, locked = true, frozen = true, global = true, ["no-git"] = true, ["no-gitignore"] = true, ["dry-run"] = true, tree = true, force = true, f = true, ["allow-git"] = true, ["allow-local-sources"] = true }
 local values = { output = true }
 function Args.parse(valuesIn)
     local result, positional = { _ = {} }, false

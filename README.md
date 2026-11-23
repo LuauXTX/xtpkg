@@ -134,7 +134,7 @@ local project and is never a registry.
 
 | Command | Behavior |
 | --- | --- |
-| `init [name] [--force]` | Create a manifest and `src/main.luau` |
+| `init [name] [--force] [--no-git] [--no-gitignore]` | Create project files, initialize Git when needed, and append missing ignore rules |
 | `add name[@range]` | Resolve, install, and save a registry dependency |
 | `add path:../package` | Install a local package, inferring its declared name |
 | `add name@path:../package` | Install a local package with an identity check |
@@ -169,6 +169,43 @@ where they have special meanings. Examples: `xtpkg add 'example/json@^1.2.0'`.
 Some third-party `.cmd` launchers strip carets while forwarding arguments. Use
 the native LuauXTX executable directly if a saved range loses its `^`; the test
 runner resolves such launchers to their native executable before argument tests.
+
+## Initialize a project
+
+`xtpkg init [name]` creates `xtpkg.toml` and `src/main.luau`, initializes a Git
+repository only when no repository exists here or in an ancestor, and creates
+or updates `.gitignore`. Parent repositories, worktrees/submodules (`.git`
+files), bare repositories, and existing Git metadata are preserved; no nested
+repository is initialized. User Git preferences such as the default branch are
+respected. Init does not stage files, create commits, or install Git hooks.
+
+Ignore updates append only missing entries. Existing bytes, comments, rules,
+line endings, and permissions remain intact; a missing final newline is added
+before appending new rules. Repeating `init --force` does not add duplicates or
+rewrite an already complete `.gitignore`. Existing `packages/` or `packages`
+rules also satisfy the root `/packages/` entry.
+
+The defaults are `/packages/`, `.xtpkg-*`, `*-submission.json`, `.env`, `.env.*`,
+`.DS_Store`, `Thumbs.db`, `Desktop.ini`, `.idea/`, `.vscode/`, `*.swp`, `*.swo`, and
+`*~`. They do not ignore `xtpkg.lock`; the `!/xtpkg.lock` exception keeps it
+trackable even when an existing broad rule such as `*.lock` is present. Existing
+user rules and their order are never removed or rewritten.
+
+```text
+xtpkg init my-app
+xtpkg init my-app --no-git            # still writes .gitignore
+xtpkg init my-app --no-gitignore      # still initializes Git when appropriate
+xtpkg init my-app --no-git --no-gitignore
+```
+
+The two options are independent. `--no-git` performs no Git initialization or
+discovery commands, and `--no-gitignore` leaves an existing file untouched (or
+does not create one). `--force` permits replacing an existing manifest; it does
+not overwrite source files or existing ignore content. Missing Git, failed Git
+discovery/initialization, or repository environment overrides produce a warning
+while leaving the created project files usable. You can run `git init` manually
+after correcting the Git installation/configuration. If ancestor metadata cannot
+be checked safely, automatic Git initialization is skipped.
 
 ## Global packages
 
@@ -387,6 +424,7 @@ files inside it. Unrelated project files outside it are never replaced.
 python -u tests/run.py
 python -u tests/run.py --runtime /absolute/path/to/luauxtx
 python -u tests/global.py
+python -u tests/init.py
 python -u tests/installers.py
 python -u tests/posix.py
 ```
@@ -408,6 +446,9 @@ idempotence, modified launchers, injected failures, and abrupt-interruption
 recovery. Windows PATH tests use a disposable registry key and temporary profiles,
 never the real user PATH. `XTPKG_PATH_PROFILE` selects a custom profile file for
 isolated/portable testing instead of the default profile/registry backend.
+Project initialization tests cover new/existing/parent/bare repositories,
+worktree Git files, append-only CRLF files, duplicate prevention, lockfile
+visibility, both opt-outs, missing/failed Git, and redirected Git environments.
 
 `.github/workflows/test.yml` builds a pinned LuauXTX revision and runs the suites
 on Windows, Ubuntu, and macOS. On this development host the native Windows tests

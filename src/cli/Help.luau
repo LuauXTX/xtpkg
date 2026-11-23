@@ -1,7 +1,7 @@
 local Help = {}
 Help.version = "0.2.0"
 Help.commands = {
-    init = "init [name] [--force]                 Create a project and entrypoint",
+    init = "init [name] [--force] [--no-git] [--no-gitignore]\n                                        Create project files, Git repository, and ignore rules",
     add = "add <name[@range]|path|name@git+url#commit> [--allow-git]\n                                        Resolve, install, and save a dependency",
     remove = "remove <name>                          Remove a direct dependency and prune its graph",
     install = "install [--locked|--frozen] [--offline] Install the exact current lock or resolve a new graph",
