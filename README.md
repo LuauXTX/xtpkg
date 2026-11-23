@@ -15,8 +15,80 @@ Run the CLI from a project directory:
 luauxtx D:/GitHub/Repositories/xtpkg/src/main.luau init my-app
 ```
 
-The examples below use `xtpkg` as shorthand for that invocation. No executable
-installer or global command is silently installed by this repository.
+Or install the `xtpkg` command using the user-level installers below. Installed
+launchers resolve the CLI independently of your current working directory.
+
+## Install XTPKG
+
+Install LuauXTX and Git first, then clone/download a trusted copy of this repository.
+The scripts verify both tools; they do not download a runtime, use administrator
+privileges, run package hooks, or install anything system-wide.
+
+```sh
+# Linux or macOS, from the XTPKG checkout
+sh install.sh
+```
+
+```powershell
+# Windows, from the XTPKG checkout
+.\install.cmd
+```
+
+Restart your terminal application after installation. You can then run
+`xtpkg --version` from any directory. Existing terminal processes keep their old
+PATH; Unix users can instead reload their shell profile. On Windows the installer
+updates only the current user's registry PATH, preserves its value type and
+literal environment-variable references, and broadcasts an environment change.
+It does not use `setx` or truncate/rewrite the system PATH. Unix setup maintains an
+idempotent marked block in `.profile` and `.bashrc`, existing `.bash_profile`, and
+zsh startup files when zsh is selected/present. Fish users receive a `conf.d`
+entry. Other profile content and existing access permissions are preserved.
+
+Default locations:
+
+| Purpose | Windows | Linux/macOS |
+| --- | --- | --- |
+| XTPKG app | `%LOCALAPPDATA%/xtpkg/app` | `$XDG_DATA_HOME/xtpkg/app` |
+| XTPKG command | `%LOCALAPPDATA%/xtpkg/bin/xtpkg.cmd` | `$XDG_DATA_HOME/xtpkg/bin/xtpkg` |
+| Global project | `%LOCALAPPDATA%/xtpkg/global` | `$XDG_DATA_HOME/xtpkg/global` |
+| Global commands | `<global-project>/bin` | `<global-project>/bin` |
+
+On Unix, unset `XDG_DATA_HOME` defaults to `~/.local/share`. Both executable
+directories are added to the user's PATH without adding duplicate entries. An
+unrelated `xtpkg` already on PATH causes a conflict instead of silently selecting
+the wrong installation; remove its obsolete PATH entry or use `--no-path` for a
+side-by-side portable install.
+
+```text
+sh install.sh --prefix "/my/user/xtpkg" --no-path
+install.cmd --prefix "D:\My Tools\xtpkg" --no-path
+```
+
+`--prefix` changes the app/bin installation root. It does not move configuration,
+registry settings, caches, or global packages. `--no-path` leaves PATH/profiles
+alone. `LUAUXTX_BIN` can select a native runtime explicitly; Windows setup can
+also resolve a batch runtime shim to its actual `.exe`. Installed commands invoke
+that native executable directly with correctly quoted arguments, including empty
+arguments and shell metacharacters. Reinstall if the native executable moves.
+
+To reinstall or upgrade, run the same installer from the newer checkout with the
+same prefix. It stages the new app, validates startup, and swaps the app and its
+managed launcher directory with rollback on failure. If XTPKG's own
+`xtpkg.toml` declares dependencies, setup installs them into the staged app using
+the normal resolver/installer; it never runs `[scripts]` or other install hooks.
+The current manifest needs no third-party dependencies. Existing configuration,
+registry choices, caches, and global packages are preserved.
+
+An interrupted setup leaves `.xtpkg-setup-operation` containing a journal and
+backups. After confirming no installer is running, repeat the same command with
+`--recover` (and the same prefix). Recovery restores the previous app/bin before
+reinstalling, or finishes cleanup if the prior operation already committed. Do
+not delete its backups before recovery. PATH file replacements are atomic; a
+process killed while updating several profiles may leave some new PATH entries,
+which recovery/reinstallation completes safely. Managed directories containing
+unrelated or modified launchers are refused rather than overwritten.
+
+These are local source installers, not scripts intended for `curl | sh`.
 
 ## Project manifest
 
@@ -35,6 +107,10 @@ localutil = "path:../localutil"
 
 [scripts]
 start = "luauxtx src/main.luau"
+
+# Optional executable entrypoints, exposed when installed globally.
+[bin]
+my-tool = "src/main.luau"
 ```
 
 Description, license, and repository are optional for private projects and
@@ -43,9 +119,12 @@ ASCII letters, digits, hyphens, and underscores. Unsafe Windows device names
 are rejected on every platform. Entries must be relative `.lua`/`.luau` paths.
 
 The supported manifest sections contain scalar TOML values; dependency and
-script values must be quoted strings. Basic/literal strings, comments, and
-quoted dependency keys are supported. Multiline strings, inline dependency
-tables, and arrays in these three sections are unsupported and rejected.
+script values must be quoted strings. `[bin]` maps command names to safe relative
+`.lua`/`.luau` files; each declared file must exist in the verified package.
+Omit `[bin]` entirely for a library. Command names are portable, unscoped lowercase
+names; Windows device names and unsafe paths are rejected. Basic/literal strings,
+comments, and quoted keys are supported. Multiline strings, inline dependency
+tables, and arrays in these supported sections are rejected.
 Other tables and their values are retained when editing dependencies. Existing
 package metadata, scripts, and unrelated text are preserved; dependency keys
 are sorted when their section is edited. `local/testproj` remains an ignored
@@ -78,6 +157,7 @@ local project and is never a registry.
 | `help [command]`, `version`, `--version` | Usage and version information |
 
 Global options: `--help`/`-h`, `--verbose`/`-v`, `--quiet`/`-q`, `--offline`.
+`add`, `remove`, `update`, `list`, and `install` also accept `--global`/`-g`.
 `--quiet` suppresses progress; requested data and errors still print. Verbose
 mode includes diagnostic tracebacks. Ordinary command errors return status 1
 without a traceback. Argument-count and unsupported-option errors are checked.
@@ -89,6 +169,44 @@ where they have special meanings. Examples: `xtpkg add 'example/json@^1.2.0'`.
 Some third-party `.cmd` launchers strip carets while forwarding arguments. Use
 the native LuauXTX executable directly if a saved range loses its `^`; the test
 runner resolves such launchers to their native executable before argument tests.
+
+## Global packages
+
+```text
+xtpkg add --global example/tool
+xtpkg add -g example/library
+xtpkg add -g path:../my-tool
+xtpkg list -g --tree
+xtpkg update -g example/tool
+xtpkg install -g --frozen
+xtpkg remove -g example/tool
+```
+
+The global directory is a standalone project with its own `xtpkg.toml`,
+`xtpkg.lock`, `packages/`, and managed `bin/`. The existing resolver, verified
+cache, lockfile semantics, and package installer are reused. Your current local
+project is not read or changed. Relative path additions resolve from the calling
+directory and are saved as absolute paths in the global manifest. Override the
+global root with `XTPKG_GLOBAL_DIR` for a portable installation or isolated tests.
+
+Only explicitly added global roots expose their `[bin]` commands. Transitive
+dependencies do not add executables to PATH. Libraries without `[bin]` are fully
+supported and remain available under the global project's normal package/import
+layout. They are not silently injected into local projects' import resolution.
+
+Global installs validate and stage launchers before changing any packages,
+manifest, or lockfile. The bin directory participates in the same rollback.
+Updates regenerate commands, and removal prunes obsolete commands and unused
+dependencies. No package code is executed during these operations.
+
+Conflicting command declarations, an unrelated executable already on PATH, a
+modified/missing managed launcher, or foreign files in a managed bin directory
+cause an error before replacement. `xtpkg` and required host-tool names such as
+`git`, `sh`, and `luauxtx` are reserved. At most 256 commands may be exposed.
+Move/restore customized launchers before retrying; no force-overwrite is implicit.
+The XTPKG installer sets up the global bin PATH entry. When invoking the source
+CLI without installing XTPKG first, global operations print the bin location and
+PATH setup guidance instead of editing shell profiles themselves.
 
 ## Registry setup
 
@@ -268,6 +386,9 @@ files inside it. Unrelated project files outside it are never replaced.
 ```text
 python -u tests/run.py
 python -u tests/run.py --runtime /absolute/path/to/luauxtx
+python -u tests/global.py
+python -u tests/installers.py
+python -u tests/posix.py
 ```
 
 The runner creates temporary Git packages and a registry, exercises the real
@@ -279,6 +400,19 @@ targeted/all updates, offline resolution, frozen reproduction, corrupted/missing
 artifacts, failed fetches, injected transaction rollback, removal, path imports,
 publishing, registry immutability validation, Git symlinks, filesystem junctions,
 legacy migration, unmanaged directory preservation, configuration, and cache cleanup.
+Global tests cover library-only packages, direct/transitive executable exposure,
+local isolation, PATH/name conflicts, updates, cleanup, frozen installation, and
+rollback. Installer tests cover dependency bootstrap, hook avoidance, reinstall,
+configuration/cache preservation, Unicode paths, argument boundaries, PATH
+idempotence, modified launchers, injected failures, and abrupt-interruption
+recovery. Windows PATH tests use a disposable registry key and temporary profiles,
+never the real user PATH. `XTPKG_PATH_PROFILE` selects a custom profile file for
+isolated/portable testing instead of the default profile/registry backend.
+
+`.github/workflows/test.yml` builds a pinned LuauXTX revision and runs the suites
+on Windows, Ubuntu, and macOS. On this development host the native Windows tests
+and POSIX shell tests under Git Bash can run; native Linux/macOS execution needs
+that CI matrix (the local WSL VM cannot start).
 
 Known limits and follow-up work:
 
@@ -294,6 +428,9 @@ Known limits and follow-up work:
   rename. Interrupted `.xtpkg-stage-*` backups and `.xtpkg-operation` guards need
   manual inspection/recovery before reuse. Cache clean refuses unknown temporary
   directories left by interrupted fetches.
+- The user-level XTPKG installer adds an explicit journal/recovery path for app
+  upgrades. Global package operations retain the package installer's existing
+  interruption-recovery limits described above.
 - The automated suite runs on the current Windows environment; Unix branches
   need platform CI. Public HTTPS retrieval and GitHub hosting need an integration
   smoke test once a real registry is configured.
