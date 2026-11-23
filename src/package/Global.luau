@@ -38,7 +38,11 @@ function Global.run(args, callback)
         local bin = path.join(root, "bin")
         local found = false
         local separator = Launchers.windows() and ";" or ":"
-        for dir in (process.getenv("PATH") or ""):gmatch("[^" .. separator .. "]+") do if path.normalize(dir):lower() == bin:lower() then found = true end end
+        for dir in (process.getenv("PATH") or ""):gmatch("[^" .. separator .. "]+") do
+            local a, b = path.normalize(dir), bin
+            if Launchers.windows() then a, b = a:lower(), b:lower() end
+            if a == b then found = true end
+        end
         if not found then args.log("Global launchers: " .. bin .. "\nRun the XTPKG installer to configure PATH, or add this directory to PATH yourself.") end
     end
     return result

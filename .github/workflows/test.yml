@@ -1,0 +1,39 @@
+name: XTPKG tests
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  native:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: MINTILER-DEV/LuauXTX
+          ref: b2cf171d62d15ebc7e452068054df3133d30cd21
+          path: local/runtime
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build native LuauXTX
+        run: cargo build --release --locked --manifest-path local/runtime/Cargo.toml
+      - name: Select runtime
+        shell: pwsh
+        run: |
+          $binary = if ($IsWindows) { 'luauxtx.exe' } else { 'luauxtx' }
+          $runtime = Join-Path $pwd "local/runtime/target/release/$binary"
+          "LUAUXTX_BIN=$runtime" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Unit and existing integration tests
+        shell: pwsh
+        run: python -u tests/run.py --runtime "$env:LUAUXTX_BIN"
+      - name: Global packages
+        run: python -u tests/global.py
+      - name: Native installers
+        run: python -u tests/installers.py
+      - name: POSIX launchers and installer frontend
+        run: python -u tests/posix.py

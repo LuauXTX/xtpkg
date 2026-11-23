@@ -22,7 +22,7 @@ def runtime_path(candidate=None):
 
 class Harness:
     def __init__(self, base):
-        self.base = Path(base)
+        self.base = Path(base).resolve()
         self.runtime = runtime_path()
         self.cwd = self.base / "caller"
         self.cwd.mkdir()

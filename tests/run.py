@@ -67,12 +67,12 @@ def canonical(data):
 
 
 with tempfile.TemporaryDirectory(prefix="xtpkg-tests-") as temporary:
-    base = Path(temporary)
+    base = Path(temporary).resolve()
     app, registry, cache, config = [base / n for n in ("app", "registry", "cache", "config")]
     for d in (app, registry, config):
         d.mkdir()
     env = dict(os.environ, XTPKG_REGISTRY=str(registry), XTPKG_CACHE_DIR=str(cache),
-               XTPKG_CONFIG_HOME=str(config), GIT_TERMINAL_PROMPT="0")
+               XTPKG_CONFIG_HOME=str(config), GIT_TERMINAL_PROMPT="0", TMPDIR=str(base))
 
     def cli(*arguments, cwd=app, ok=True, environment=None):
         return execute([runtime, str(ROOT / "src/main.luau"), *arguments], cwd,
@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="xtpkg-tests-") as temporary:
     def luau(script, cwd=app, ok=True):
         return execute([runtime, str(script)], cwd, env, ok)
 
-    for name in ("core", "resolver", "security", "registry-client"):
+    for name in ("core", "resolver", "security", "registry-client", "setup"):
         print(f"Running {name} checks...", flush=True)
         report = luau(ROOT / f"tests/{name}.luau").strip()
         print(report, flush=True)

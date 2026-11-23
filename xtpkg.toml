@@ -10,3 +10,6 @@
 
 [scripts]
 "start" = "luauxtx src/main.luau"
+
+[bin]
+xtpkg = "src/main.luau"

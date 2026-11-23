@@ -1,3 +1,0 @@
-#!/bin/bash
-
-luauxtx ./src/main.luau "$@"
