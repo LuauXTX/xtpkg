@@ -1,4 +1,4 @@
 {
-	"name": "xtpkg",
-	"run": "luauxtx src/main.luau"
+  "name": "xtpkg",
+  "run": "luauxtx src/main.luau"
 }

@@ -238,17 +238,45 @@ dependencies. No package code is executed during these operations.
 
 Conflicting command declarations, an unrelated executable already on PATH, a
 modified/missing managed launcher, or foreign files in a managed bin directory
-cause an error before replacement. `xtpkg` and required host-tool names such as
-`git`, `sh`, and `luauxtx` are reserved. At most 256 commands may be exposed.
+cause an error before replacement. Required host-tool names such as `git`, `sh`,
+and `luauxtx` are reserved. Only the official registry package `xtpkg`, fetched
+from its original upstream, may claim the manager command. At most 256 commands may be exposed.
 Move/restore customized launchers before retrying; no force-overwrite is implicit.
 The XTPKG installer sets up the global bin PATH entry. When invoking the source
 CLI without installing XTPKG first, global operations print the bin location and
 PATH setup guidance instead of editing shell profiles themselves.
 
+## Update XTPKG through packages
+
+```text
+xtpkg add xtpkg@0.2.1 -g
+xtpkg add xtpkg -g
+xtpkg update xtpkg -g
+```
+
+The installer now creates a stable bootstrap launcher. It selects the verified
+global `xtpkg` package after its package/lock/bin transaction commits, so the
+existing app-bin PATH entry no longer masks the selected release. Updates roll
+back together with the global project. Other packages cannot replace this command,
+and modified/unmanaged executables remain protected. `xtpkg remove xtpkg -g`
+returns to the host installation, which remains available as a recovery fallback.
+
+Releases installed before bootstrap support need a one-time `install.cmd` or
+`sh install.sh` from this checkout; use `--no-path` to retain existing PATH setup.
+The bootstrap supports old releases such as 0.2.1: their normal commands run the
+selected release, while global operations and the `publish`/`config` formatting
+fixes use the host compatibility implementation. New releases with self-update
+support run their own implementation. Version output reflects the selected
+package manifest, including older releases whose built-in version text was stale.
+The host install is not deleted or rewritten by a package update.
+
 ## Registry setup
 
-There is **no default production registry**. Start with the empty template in
-[`registry/`](registry/README.md), or create a GitHub repository with this layout:
+The default public registry is
+[`LuauXTX/xtpkg-registry`](https://github.com/LuauXTX/xtpkg-registry), using
+`https://raw.githubusercontent.com/LuauXTX/xtpkg-registry/main`. Environment and
+saved configuration overrides take precedence. To host a separate registry, start
+with the empty template in [`registry/`](registry/README.md) and this layout:
 
 ```text
 index.json
@@ -316,6 +344,14 @@ Configuration defaults to `%APPDATA%/xtpkg/config.json` on Windows and
 6. Registry maintainers review the code and metadata, validate the registry,
    and approve the submission by merging the PR. Installation needs no GitHub
    authentication for public repositories. There is no public write API.
+
+For the official registry, add the generated JSON to its `submissions/` inbox
+instead of editing package records by hand. Its workflows validate submissions
+and prepare a metadata/index PR after the submission is reviewed. Maintainers
+merge the resulting PR to publish; no package source or install hooks execute.
+All generated submissions, configuration, import maps, launcher ownership files,
+and setup journals use readable two-space JSON. Internal cache keys and integrity
+calculations retain compact canonical JSON so formatting cannot change checksums.
 
 Ignore or move generated submissions before a subsequent clean-tree publish
 check. Publishing checks local committed contents; it does not verify that a

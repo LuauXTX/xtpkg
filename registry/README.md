@@ -1,6 +1,7 @@
 # Registry template
 
-This is an empty registry template, not a configured public registry. Copy it
+This is an empty custom-registry template. XTPKG's default public registry is
+https://github.com/LuauXTX/xtpkg-registry. Copy this template
 into a dedicated GitHub repository, enable branch protection and required PR
 review, and configure XTPKG with its raw HTTPS base URL or a local directory.
 
