@@ -111,4 +111,23 @@ function Json.decode(s, limit)
     local result = parse(0); space(); if i <= #s then fail() end
     return result
 end
+-- Human-facing files use this formatter; encode remains the canonical byte
+-- representation for checksums, cache keys, and immutable-record comparisons.
+function Json.pretty(value)
+    local function format(v, depth)
+        if type(v) ~= "table" or kind(v) == "null" then return Json.encode(v) end
+        if depth > 40 then error("JSON nesting exceeds formatting limit", 0) end
+        local array = kind(v) == "array"
+        local keys = {}
+        if array then for i in ipairs(v) do table.insert(keys, i) end
+        else for k in pairs(v) do assert(type(k) == "string", "JSON object keys must be strings"); table.insert(keys, k) end; table.sort(keys) end
+        if #keys == 0 then return array and "[]" or "{}" end
+        local lines = {}
+        for _, key in ipairs(keys) do
+            table.insert(lines, string.rep("  ", depth + 1) .. (array and "" or (Json.encode(key) .. ": ")) .. format(v[key], depth + 1))
+        end
+        return (array and "[\n" or "{\n") .. table.concat(lines, ",\n") .. "\n" .. string.rep("  ", depth) .. (array and "]" or "}")
+    end
+    return format(value, 0) .. "\n"
+end
 return Json

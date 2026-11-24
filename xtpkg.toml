@@ -1,7 +1,7 @@
 [package]
 "entry" = "src/main.luau"
 "name" = "xtpkg"
-"version" = "0.2.1"
+"version" = "0.2.2"
 "description" = "A lightweight LuauXTX package manager featuring deterministic dependency resolution, SemVer versioning, Git-based registries, verified caching, and reproducible installations."
 "license" = "MIT"
 "repository" = "https://github.com/MINTILER-DEV/xtpkg"

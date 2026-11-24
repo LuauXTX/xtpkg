@@ -45,18 +45,19 @@ function Launchers.verify(directory)
     end
     for name in pairs(data.files) do if not table.find(children, name) then error("Managed executable is missing; restore it before updating: " .. name, 0) end end
 end
-function Launchers.conflict(name, destination)
+function Launchers.conflict(name, destination, allowedDirectories)
     local reserved = { xtpkg = true, luauxtx = true, git = true, sh = true, bash = true, cmd = true, powershell = true, chmod = true, stat = true, find = true, where = true, uname = true }
-    if reserved[name] then error("Executable name " .. name .. " is reserved for the package manager and its host tools", 0) end
-    Launchers.pathConflict(name, destination)
+    if reserved[name] and not (name == "xtpkg" and allowedDirectories) then error("Executable name " .. name .. " is reserved for the package manager and its host tools", 0) end
+    Launchers.pathConflict(name, destination, allowedDirectories)
 end
-function Launchers.pathConflict(name, destination)
+function Launchers.pathConflict(name, destination, allowedDirectories)
     local separator = Launchers.windows() and ";" or ":"
     for dir in (process.getenv("PATH") or ""):gmatch("[^" .. separator .. "]+") do
         dir = dir:gsub('^"(.*)"$', "%1")
         local normalized, target = path.normalize(dir), path.normalize(destination)
         if Launchers.windows() then normalized, target = normalized:lower(), target:lower() end
         if normalized == target then continue end
+        if allowedDirectories and allowedDirectories[normalized] then continue end
         for _, suffix in ipairs(Launchers.windows() and { "", ".exe", ".cmd", ".bat", ".com", ".ps1" } or { "" }) do
             if fs.exists(path.join(dir, name .. suffix)) then error("Executable conflict on PATH: " .. name .. " in " .. dir, 0) end
         end
@@ -76,6 +77,6 @@ function Launchers.write(directory, commands, runtime)
         if not Launchers.windows() and process.exec("/bin/chmod", { "755", target }).code ~= 0 then error("Could not mark launcher executable", 0) end
         ownership.files[filename] = Util.sha(contents)
     end
-    fs.writeSync(path.join(directory, marker), Json.encode(ownership))
+    fs.writeSync(path.join(directory, marker), Json.pretty(ownership))
 end
 return Launchers

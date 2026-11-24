@@ -81,7 +81,7 @@ with tempfile.TemporaryDirectory(prefix="xtpkg-tests-") as temporary:
     def luau(script, cwd=app, ok=True):
         return execute([runtime, str(script)], cwd, env, ok)
 
-    for name in ("core", "resolver", "security", "registry-client", "setup", "project-init"):
+    for name in ("core", "resolver", "security", "registry-client", "setup", "project-init", "pretty"):
         print(f"Running {name} checks...", flush=True)
         report = luau(ROOT / f"tests/{name}.luau").strip()
         print(report, flush=True)
@@ -128,7 +128,8 @@ with tempfile.TemporaryDirectory(prefix="xtpkg-tests-") as temporary:
 
     save_registry()
     print("Testing CLI, registry, and exact Git installation...", flush=True)
-    check("0.2.0" in cli("--version"))
+    version = re.search(r'(?m)^"?version"?\s*=\s*"([^"]+)"', (ROOT / "xtpkg.toml").read_text()).group(1)
+    check("xtpkg " + version in cli("--version"))
     check("Usage: xtpkg add" in cli("help", "add"))
     check("Unknown command" in cli("no-such-command", ok=False))
     check("Unknown option" in cli("install", "--invalid", ok=False))

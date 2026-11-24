@@ -30,6 +30,6 @@ return { run = function(args)
     if fs.exists(destination) then error("Submission output already exists: " .. output .. ". Choose a new --output path.", 0) end
     if not fs.exists(path.dirname(destination)) then error("Submission output parent directory does not exist", 0) end
     local temporary = destination .. "." .. Util.id()
-    fs.writeSync(temporary, Json.encode(submission) .. "\n"); fs.rename(temporary, destination):await()
+    fs.writeSync(temporary, Json.pretty(submission)); fs.rename(temporary, destination):await()
     args.log("Wrote " .. output .. "\nPush commit " .. revision .. " to " .. p.repository .. ".\nOpen a pull request against your registry repository:\n  Merge this version into packages/" .. p.name .. ".json; preserve every existing immutable version.\n  Add/update index.json packages[" .. Json.encode(p.name) .. "] with its metadata path and description.\nRegistry maintainers review and merge the PR. This command does not upload or publish anything.")
 end }

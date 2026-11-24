@@ -1,0 +1,16 @@
+local J = require("../src/package/Json")
+local C = require("../src/package/Config")
+local count = 0
+local function check(v) count += 1; assert(v, "pretty check " .. count) end
+local data = J.decode('{"z":[1,false,null,{},[]],"a":{"x":"é\\nquoted\\\""}}')
+local canonical = J.encode(data)
+local pretty = J.pretty(data)
+check(pretty:sub(-1) == "\n")
+check(pretty:find('\n  "a": {\n    "x": ', 1, true) ~= nil)
+check(J.encode(J.decode(pretty)) == canonical)
+check(J.encode(data) == canonical)
+check(J.pretty(J.decode('[]')) == "[]\n")
+check(J.pretty({}) == "{}\n")
+check(J.pretty(J.null) == "null\n")
+check(C.defaultRegistry == "https://raw.githubusercontent.com/LuauXTX/xtpkg-registry/main")
+print("Pretty JSON checks passed: " .. count)

@@ -3,6 +3,7 @@ local path = require("system/path")
 local Json = require("./Json")
 local Util = require("./Util")
 local Config = {}
+Config.defaultRegistry = "https://raw.githubusercontent.com/LuauXTX/xtpkg-registry/main"
 function Config.data()
     if process.getenv("COMSPEC") then return path.join(assert(process.getenv("LOCALAPPDATA"), "LOCALAPPDATA is required"), "xtpkg") end
     return path.join(process.getenv("XDG_DATA_HOME") or path.join(assert(process.getenv("HOME"), "HOME is required"), ".local", "share"), "xtpkg")
@@ -38,8 +39,7 @@ function Config.validateRegistry(value)
     return value:gsub("/$", "")
 end
 function Config.registry()
-    local value = process.getenv("XTPKG_REGISTRY") or Config.load().registry
-    if not value then error("No registry configured. Run xtpkg config set registry <HTTPS base URL or local directory>, or set XTPKG_REGISTRY.", 0) end
+    local value = process.getenv("XTPKG_REGISTRY") or Config.load().registry or Config.defaultRegistry
     return Config.validateRegistry(value)
 end
 function Config.set(key, value)
@@ -49,6 +49,6 @@ function Config.set(key, value)
     local t = Config.load(); t[key] = value
     Util.noLinks(Config.home()); Util.mkdir(Config.home())
     local filename = path.join(Config.home(), "config.json"); local temp = filename .. "." .. Util.id()
-    fs.writeSync(temp, Json.encode(t) .. "\n"); fs.rename(temp, filename):await()
+    fs.writeSync(temp, Json.pretty(t)); fs.rename(temp, filename):await()
 end
 return Config

@@ -5,6 +5,7 @@ local Source = require("./Source")
 local Json = require("./Json")
 local Lockfile = require("./Lockfile")
 local Launchers = require("./Launchers")
+local SelfUpdate = require("./SelfUpdate")
 local Installer = {}
 local marker = "xtpkg-packages-v2\n"
 local function checkOwned(directory, previous)
@@ -55,7 +56,7 @@ function Installer.install(directory, previous, lock, options)
             count += 1
         end
         fs.writeSync(path.join(stagedPackages, ".xtpkg-owned"), marker)
-        fs.writeSync(path.join(stagedPackages, ".xtpkg-imports.json"), Json.encode(imports) .. "\n")
+        fs.writeSync(path.join(stagedPackages, ".xtpkg-imports.json"), Json.pretty(imports))
         local module = { "-- Generated named-import adapter for LuauXTX's relative require API.", "local runtimeRequire = require", "local paths = {" }
         for _, name in ipairs(Util.keys(imports)) do table.insert(module, "  [" .. Json.encode(name) .. "] = " .. Json.encode(imports[name].path) .. ",") end
         table.insert(module, "}\nreturn { require = function(name)\n  local p = paths[name]\n  assert(p, 'Package is not installed: ' .. tostring(name))\n  return runtimeRequire(p)\nend }\n")
@@ -66,8 +67,14 @@ function Installer.install(directory, previous, lock, options)
             for _, name in ipairs(Util.keys(lock.roots)) do
                 for executable, entry in pairs(manifests[name].bin) do
                     if commands[executable] then error("Executable conflict: multiple global packages declare " .. executable, 0) end
-                    Launchers.conflict(executable, bin)
-                    commands[executable] = path.join(directory, "packages", name, entry)
+                    if executable == "xtpkg" then
+                        local bootstrap, allowed = SelfUpdate.launcher(lock.packages[name], manifests[name], Launchers.runtime())
+                        Launchers.conflict(executable, bin, allowed)
+                        commands[executable] = bootstrap
+                    else
+                        Launchers.conflict(executable, bin)
+                        commands[executable] = path.join(directory, "packages", name, entry)
+                    end
                 end
             end
             Launchers.write(path.join(stage, "bin"), commands, Launchers.runtime())

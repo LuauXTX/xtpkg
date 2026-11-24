@@ -33,6 +33,10 @@ class Harness:
                         XDG_DATA_HOME=str(self.base / "data"), XDG_CONFIG_HOME=str(self.base / "config"),
                         XTPKG_CACHE_DIR=str(self.base / "cache"), XTPKG_CONFIG_HOME=str(self.base / "config"),
                         XTPKG_GLOBAL_DIR=str(self.base / "global"), LUAUXTX_BIN=self.runtime)
+        # Keep an already-installed real XTPKG out of isolated installer tests.
+        suffixes = ("", ".cmd", ".exe", ".bat") if os.name == "nt" else ("",)
+        self.env["PATH"] = os.pathsep.join(d for d in self.env["PATH"].split(os.pathsep)
+                                           if not any((Path(d.strip('"')) / ("xtpkg" + suffix)).is_file() for suffix in suffixes))
         Path(self.env["HOME"]).mkdir()
         self.count = 0
 

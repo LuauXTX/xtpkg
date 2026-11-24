@@ -17,7 +17,7 @@ local function ownedApp(directory)
 end
 local function journal(work, state)
     local temporary = path.join(work, "journal.new")
-    fs.writeSync(temporary, Json.encode(state))
+    fs.writeSync(temporary, Json.pretty(state))
     fs.rename(temporary, path.join(work, "journal.json")):await()
 end
 local function restore(prefix, work, state)
@@ -99,7 +99,7 @@ function Install.run(source, options)
             if r.code ~= 0 then error("Dependency bootstrap failed; existing installation is unchanged.\n" .. r.stdout .. r.stderr, 0) end
         end
         fs.writeSync(path.join(app, ".xtpkg-app"), appMarker)
-        Launchers.write(path.join(work, "bin"), { xtpkg = path.join(prefix, "app", manifest.package.entry) }, runtime)
+        Launchers.write(path.join(work, "bin"), { xtpkg = path.join(prefix, "app", "src", "bootstrap.luau") }, runtime)
         -- Check the staged CLI before changing any installed files or PATH.
         local probe = process.exec(runtime, { path.join(app, manifest.package.entry), "--version" }, { cwd = app })
         if probe.code ~= 0 then error("Staged XTPKG failed its startup check", 0) end

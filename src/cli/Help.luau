@@ -1,5 +1,5 @@
 local Help = {}
-Help.version = "0.2.0"
+Help.version = "0.2.2"
 Help.commands = {
     init = "init [name] [--force] [--no-git] [--no-gitignore]\n                                        Create project files, Git repository, and ignore rules",
     add = "add <name[@range]|path|name@git+url#commit> [--allow-git]\n                                        Resolve, install, and save a dependency",
